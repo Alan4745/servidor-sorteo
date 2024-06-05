@@ -1,0 +1,26 @@
+{
+  "name": "servidor-sorteo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node Server.js",
+    "dev": "nodemon Server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "moment-timezone": "^0.5.45",
+    "mongoose": "^8.4.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5",
+    "nodemon": "^3.1.1"
+  }
+}
