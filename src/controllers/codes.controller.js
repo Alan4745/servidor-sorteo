@@ -35,7 +35,7 @@ function desencriptarDato(encrypted, key, iv) {
 const getRandomCode = async (req, res) => {
   try {
     const [rows] = await global.db.execute(
-      "SELECT * FROM Codes ORDER BY RAND() LIMIT 1"
+      "SELECT * FROM codes ORDER BY RAND() LIMIT 1"
     );
 
     if (rows.length === 0) {
@@ -53,7 +53,7 @@ const getRandomCodeV2 = async (req, res) => {
   try {
     const query = `
       SELECT codigo, pais, nombre, apellidos, fechaNacimiento, documentoIdentificacion, telefono, correoElectronico 
-      FROM Codes 
+      FROM codes 
       WHERE documentoIdentificacion != '' 
       AND pais != '' 
       AND nombre != '' 
