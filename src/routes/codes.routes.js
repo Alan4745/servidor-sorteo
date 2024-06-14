@@ -7,7 +7,7 @@ const api = express.Router();
 //   res.send("Hola Mundo desde Express!");
 // });
 
-api.post("/generarCodigos", controllerCodes.crearTickets);
+// api.post("/generarCodigos", controllerCodes.crearTickets);
 
 api.get("/random-code", controllerCodes.getRandomCode);
 
