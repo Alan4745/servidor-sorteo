@@ -127,7 +127,7 @@ const getCodeByCodigo = async (req, res) => {
     }
 
     const [rows] = await global.db.execute(
-      "SELECT * FROM Codes WHERE codigo = ?",
+      "SELECT * FROM codes WHERE codigo = ?",
       [codigo]
     );
 
@@ -142,7 +142,7 @@ const getCodeByCodigo = async (req, res) => {
     }
 
     const updateQuery = `
-      UPDATE Codes 
+      UPDATE codes 
       SET edad = ?, pais = ?, nombre = ?, apellidos = ?, fechaNacimiento = ?, 
           documentoIdentificacion = ?, telefono = ?, correoElectronico = ?, 
           fechaCajeado = ?, estadoCanjeado = true 
@@ -165,7 +165,7 @@ const getCodeByCodigo = async (req, res) => {
     ]);
 
     const [updatedRows] = await global.db.execute(
-      "SELECT * FROM Codes WHERE codigo = ?",
+      "SELECT * FROM codes WHERE codigo = ?",
       [codigo]
     );
 
@@ -187,7 +187,7 @@ const findByPersonalDocument = async (req, res) => {
     }
 
     const [rows] = await global.db.execute(
-      "SELECT * FROM Codes WHERE documentoIdentificacion = ?",
+      "SELECT * FROM codes WHERE documentoIdentificacion = ?",
       [documentoIdentificacion]
     );
 
