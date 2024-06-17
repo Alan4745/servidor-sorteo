@@ -109,8 +109,6 @@ const getCodeByCodigo = async (req, res) => {
       correoElectronico,
     } = req.body;
 
-    console.log(req.body);
-
     const edadCalculada = calcularEdad(fechaNacimiento);
 
     if (edadCalculada < 18) {
@@ -126,52 +124,57 @@ const getCodeByCodigo = async (req, res) => {
       });
     }
 
-    const [rows] = await global.db.execute(
-      "SELECT * FROM codes WHERE codigo = ?",
-      [codigo]
-    );
+    const connection = await global.db.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        "SELECT * FROM codes WHERE codigo = ? FOR UPDATE",
+        [codigo]
+      );
 
-    if (rows.length === 0) {
-      return res.status(404).json({ message: "Código no encontrado" });
+      if (rows.length === 0) {
+        return res.status(404).json({ message: "Código no encontrado" });
+      }
+
+      const code = rows[0];
+
+      if (code.estadoCanjeado) {
+        return res
+          .status(400)
+          .json({ message: "El código ya ha sido canjeado" });
+      }
+
+      const updateQuery = `
+        UPDATE codes 
+        SET edad = ?, pais = ?, nombre = ?, apellidos = ?, fechaNacimiento = ?, 
+            documentoIdentificacion = ?, telefono = ?, correoElectronico = ?, 
+            fechaCajeado = ?, estadoCanjeado = true 
+        WHERE codigo = ?
+      `;
+
+      const fechaCajeado = moment.tz("America/Guatemala").toDate();
+
+      await connection.execute(updateQuery, [
+        edadCalculada,
+        pais,
+        nombre,
+        apellidos,
+        fechaNacimiento,
+        documentoIdentificacion,
+        telefono,
+        correoElectronico,
+        fechaCajeado,
+        codigo,
+      ]);
+
+      const [updatedRows] = await connection.execute(
+        "SELECT * FROM codes WHERE codigo = ?",
+        [codigo]
+      );
+
+      res.status(200).json(updatedRows[0]);
+    } finally {
+      connection.release(); // Liberar la conexión al pool
     }
-
-    const code = rows[0];
-
-    console.log(code);
-
-    if (code.estadoCanjeado) {
-      return res.status(400).json({ message: "El código ya ha sido canjeado" });
-    }
-
-    const updateQuery = `
-      UPDATE codes 
-      SET edad = ?, pais = ?, nombre = ?, apellidos = ?, fechaNacimiento = ?, 
-          documentoIdentificacion = ?, telefono = ?, correoElectronico = ?, 
-          fechaCajeado = ?, estadoCanjeado = true 
-      WHERE codigo = ?
-    `;
-
-    const fechaCajeado = moment.tz("America/Guatemala").toDate();
-
-    await global.db.execute(updateQuery, [
-      edadCalculada,
-      pais,
-      nombre,
-      apellidos,
-      fechaNacimiento,
-      documentoIdentificacion,
-      telefono,
-      correoElectronico,
-      fechaCajeado,
-      codigo,
-    ]);
-
-    const [updatedRows] = await global.db.execute(
-      "SELECT * FROM codes WHERE codigo = ?",
-      [codigo]
-    );
-
-    res.status(200).json(updatedRows[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al buscar o actualizar el código" });
