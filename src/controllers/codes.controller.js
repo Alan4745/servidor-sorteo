@@ -137,6 +137,8 @@ const getCodeByCodigo = async (req, res) => {
 
     const code = rows[0];
 
+    console.log(code);
+
     if (code.estadoCanjeado) {
       return res.status(400).json({ message: "El código ya ha sido canjeado" });
     }
