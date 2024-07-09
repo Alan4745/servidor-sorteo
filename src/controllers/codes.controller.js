@@ -1,36 +1,76 @@
-const crypto = require("crypto");
+const crypto = require("crypto-js");
 const moment = require("moment-timezone");
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 
-function generarCodigo(longitud) {
-  const caracteres =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let codigo = "";
-  for (let i = 0; i < longitud; i++) {
-    codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-  }
-  return codigo;
+const secretKey = process.env.ENCRYPTION_KEY;
+
+function descifrarDato(datoCifrado) {
+  const bytes = crypto.AES.decrypt(datoCifrado, secretKey);
+  return bytes.toString(crypto.enc.Utf8);
 }
 
 function cifrarDato(dato) {
-  const algorithm = "aes-256-cbc";
-  const key = crypto.randomBytes(32);
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(algorithm, key, iv);
-  let encrypted = cipher.update(dato, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  return { encrypted, key: key.toString("hex"), iv: iv.toString("hex") };
+  return crypto.AES.encrypt(dato, secretKey).toString();
 }
 
-function desencriptarDato(encrypted, key, iv) {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-cbc",
-    Buffer.from(key, "hex"),
-    Buffer.from(iv, "hex")
-  );
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
-}
+const buscarPorIdentificacion = async (req, res) => {
+  try {
+    const { documentoIdentificacion } = req.body;
+    const connection = await global.db.getConnection();
+    try {
+      const [rows] = await connection.execute(
+        "SELECT * FROM codes WHERE documentoIdentificacion = ?",
+        [documentoIdentificacion]
+      );
+
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "Identificación no encontrada" });
+      }
+
+      res.status(200).json(rows);
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al buscar por identificación" });
+  }
+};
+
+// Configurar nodemailer
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: process.env.EMAIL_SECURE, // Use `true` for port 465, `false` for all other ports
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
+
+// Función para enviar correos electrónicos
+const sendEmail = async (req, res) => {
+  const { to, subject, text } = req.body;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject,
+      text,
+    });
+    console.log(`Correo enviado a ${to}`);
+    res.status(200).json({ message: `Correo enviado a ${to}` });
+  } catch (error) {
+    console.error("Error al enviar el correo:", error.message);
+    res
+      .status(500)
+      .json({ message: "Error al enviar el correo", error: error.message });
+  }
+};
 
 const getRandomCode = async (req, res) => {
   try {
@@ -42,7 +82,15 @@ const getRandomCode = async (req, res) => {
       return res.status(404).json({ message: "No se encontraron códigos" });
     }
 
-    res.status(200).json(rows[0]);
+    // Enviar correo electrónico con el código aleatorio
+    const code = rows[0];
+    await sendEmail(
+      code.correoElectronico,
+      "Tu Código Aleatorio",
+      `Tu código es: ${code.codigo}`
+    );
+
+    res.status(200).json(code);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener el código" });
@@ -70,7 +118,16 @@ const getRandomCodeV2 = async (req, res) => {
       return res.status(404).json({ message: "No se encontraron códigos" });
     }
 
-    res.status(200).json(rows[0]);
+    const code = rows[0];
+
+    // Enviar correo electrónico con el código aleatorio
+    await sendEmail(
+      code.correoElectronico,
+      "Tu Código Aleatorio",
+      `Tu código es: ${code.codigo}`
+    );
+
+    res.status(200).json(code);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener el código" });
@@ -105,6 +162,7 @@ const getCodeByCodigo = async (req, res) => {
       apellidos,
       fechaNacimiento,
       documentoIdentificacion,
+      telefono_pais,
       telefono,
       correoElectronico,
     } = req.body;
@@ -117,12 +175,9 @@ const getCodeByCodigo = async (req, res) => {
       });
     }
 
-    if (!/^\d{13}$/.test(documentoIdentificacion)) {
-      return res.status(400).json({
-        message:
-          "El documento de identificación debe contener solo números y tener una longitud de 13 caracteres",
-      });
-    }
+    const telefonoCompleto = telefono_pais + telefono;
+
+    console.log(telefonoCompleto);
 
     const connection = await global.db.getConnection();
     try {
@@ -160,7 +215,7 @@ const getCodeByCodigo = async (req, res) => {
         apellidos,
         fechaNacimiento,
         documentoIdentificacion,
-        telefono,
+        telefonoCompleto,
         correoElectronico,
         fechaCajeado,
         codigo,
@@ -218,4 +273,6 @@ module.exports = {
   getRandomCodeV2,
   getCodeByCodigo,
   findByPersonalDocument,
+  buscarPorIdentificacion,
+  sendEmail, // Exportar la función para enviar correos
 };

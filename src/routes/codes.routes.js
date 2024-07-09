@@ -8,12 +8,15 @@ const api = express.Router();
 // });
 
 // api.post("/generarCodigos", controllerCodes.crearTickets);
+api.post("/enviarCorreo", controllerCodes.sendEmail);
 
 api.get("/random-code", controllerCodes.getRandomCode);
 
 api.get("/random-codeV2", controllerCodes.getRandomCodeV2);
 
 api.put("/code/:codigo", controllerCodes.getCodeByCodigo);
+
+api.post("/buscarPorIdentificacion", controllerCodes.buscarPorIdentificacion);
 
 api.get(
   "/codeCashing/:documentoIdentificacion",
