@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Correo de Confirmación</title>
+    <style>
+      .container {
+        padding: 20px;
+        font-family: Arial, sans-serif;
+      }
+      .header {
+        background-color: #007bff;
+        color: white;
+        padding: 10px;
+        text-align: center;
+      }
+      .content {
+        margin: 20px 0;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 0.8em;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>{{subject}}</h1>
+      </div>
+      <div class="content">
+        <p>{{text}}</p>
+      </div>
+      <div class="footer">
+        <p>
+          Este es un mensaje automático. Por favor, no respondas a este correo.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

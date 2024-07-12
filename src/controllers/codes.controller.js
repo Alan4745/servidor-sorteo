@@ -1,18 +1,25 @@
-const crypto = require("crypto-js");
 const moment = require("moment-timezone");
 const nodemailer = require("nodemailer");
 require("dotenv").config();
+const path = require("path");
+const fs = require("fs");
 
-const secretKey = process.env.ENCRYPTION_KEY;
+// Configurar nodemailer
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: process.env.EMAIL_SECURE, // Use `true` for port 465, `false` for all other ports
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
 
-function descifrarDato(datoCifrado) {
-  const bytes = crypto.AES.decrypt(datoCifrado, secretKey);
-  return bytes.toString(crypto.enc.Utf8);
-}
-
-function cifrarDato(dato) {
-  return crypto.AES.encrypt(dato, secretKey).toString();
-}
+const getRandomReward = () => {
+  const rewards = ["Premio 1", "Premio 2", "Premio 3"];
+  const randomIndex = Math.floor(Math.random() * rewards.length);
+  return rewards[randomIndex];
+};
 
 const buscarPorIdentificacion = async (req, res) => {
   try {
@@ -40,35 +47,35 @@ const buscarPorIdentificacion = async (req, res) => {
   }
 };
 
-// Configurar nodemailer
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE, // Use `true` for port 465, `false` for all other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
-
 // Función para enviar correos electrónicos
-const sendEmail = async (req, res) => {
-  const { to, subject, text } = req.body;
-
+const sendEmail = async (to, subject, text, code) => {
   try {
+    // Ajusta la ruta aquí
+    const emailTemplatePath = path.join(
+      __dirname,
+      "..",
+      "template",
+      "emailTemplate.html"
+    );
+    let emailTemplate = fs.readFileSync(emailTemplatePath, "utf8");
+
+    // Reemplazar las variables en la plantilla
+    emailTemplate = emailTemplate.replace(
+      "{{subject}}",
+      `${code} - ${subject}`
+    );
+    emailTemplate = emailTemplate.replace("{{text}}", text);
+
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to,
-      subject,
-      text,
+      subject: `${code} - ${subject}`,
+      html: emailTemplate,
     });
     console.log(`Correo enviado a ${to}`);
-    res.status(200).json({ message: `Correo enviado a ${to}` });
   } catch (error) {
     console.error("Error al enviar el correo:", error.message);
-    res
-      .status(500)
-      .json({ message: "Error al enviar el correo", error: error.message });
+    throw new Error("Error al enviar el correo");
   }
 };
 
@@ -87,7 +94,8 @@ const getRandomCode = async (req, res) => {
     await sendEmail(
       code.correoElectronico,
       "Tu Código Aleatorio",
-      `Tu código es: ${code.codigo}`
+      `Tu código es: ${code.codigo}`,
+      `${code.codigo}`
     );
 
     res.status(200).json(code);
@@ -153,7 +161,7 @@ function calcularEdad(fechaNacimiento) {
   return edad;
 }
 
-const getCodeByCodigo = async (req, res) => {
+const redeemCodeByCodigo = async (req, res) => {
   try {
     const { codigo } = req.params;
     const {
@@ -181,8 +189,9 @@ const getCodeByCodigo = async (req, res) => {
 
     const connection = await global.db.getConnection();
     try {
+      // Convertir ambos el código en la base de datos y el proporcionado a minúsculas para la comparación
       const [rows] = await connection.execute(
-        "SELECT * FROM codes WHERE codigo = ? FOR UPDATE",
+        "SELECT * FROM codes WHERE LOWER(codigo) = LOWER(?) FOR UPDATE",
         [codigo]
       );
 
@@ -218,15 +227,52 @@ const getCodeByCodigo = async (req, res) => {
         telefonoCompleto,
         correoElectronico,
         fechaCajeado,
-        codigo,
+        code.codigo, // No olvides usar el código original para actualizar
       ]);
 
-      const [updatedRows] = await connection.execute(
-        "SELECT * FROM codes WHERE codigo = ?",
-        [codigo]
+      // Contar los registros en cashingCodes
+      const [countRows] = await connection.execute(
+        "SELECT COUNT(*) AS count FROM cashingCodes"
+      );
+      const { count } = countRows[0];
+
+      let reward = "Sin premio";
+
+      // Si el nuevo registro es múltiplo de 5, asignar un premio
+      if ((count + 1) % 5 === 0) {
+        reward = getRandomReward();
+      }
+
+      const insertQuery = `
+        INSERT INTO cashingCodes (codigo, fechaRegistro, horaRegistro, idCodigo, reward) 
+        VALUES (?, ?, ?, ?, ?)
+      `;
+
+      const fechaRegistro = moment.tz("America/Guatemala").format("YYYY-MM-DD");
+      const horaRegistro = moment.tz("America/Guatemala").format("HH:mm:ss");
+
+      await connection.execute(insertQuery, [
+        codigo,
+        fechaRegistro,
+        horaRegistro,
+        code.id, // Asumiendo que idCodigo es el id del código en la tabla codes
+        reward,
+      ]);
+
+      await sendEmail(
+        correoElectronico,
+        "Código Canjeado con Éxito",
+        `Tu código ${codigo} ha sido canjeado con éxito. ${
+          reward === "Sin premio"
+            ? ""
+            : `Has ganado un premio adicional: ${reward}`
+        }`,
+        codigo
       );
 
-      res.status(200).json(updatedRows[0]);
+      res
+        .status(200)
+        .json({ message: "Código canjeado con éxito", code, reward });
     } finally {
       connection.release(); // Liberar la conexión al pool
     }
@@ -271,8 +317,7 @@ const findByPersonalDocument = async (req, res) => {
 module.exports = {
   getRandomCode,
   getRandomCodeV2,
-  getCodeByCodigo,
+  redeemCodeByCodigo,
   findByPersonalDocument,
   buscarPorIdentificacion,
-  sendEmail, // Exportar la función para enviar correos
 };

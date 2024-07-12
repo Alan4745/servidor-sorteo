@@ -8,13 +8,12 @@ const api = express.Router();
 // });
 
 // api.post("/generarCodigos", controllerCodes.crearTickets);
-api.post("/enviarCorreo", controllerCodes.sendEmail);
 
 api.get("/random-code", controllerCodes.getRandomCode);
 
 api.get("/random-codeV2", controllerCodes.getRandomCodeV2);
 
-api.put("/code/:codigo", controllerCodes.getCodeByCodigo);
+api.put("/redeemCode/:codigo", controllerCodes.redeemCodeByCodigo);
 
 api.post("/buscarPorIdentificacion", controllerCodes.buscarPorIdentificacion);
 
